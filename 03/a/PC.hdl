@@ -16,5 +16,23 @@ CHIP PC {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+    // Register input flows through 3 Mux gates with each one
+    // deciding whether or not to alter its given value 
+
+    // Set input to 0 if reset = 1 is set
+    Mux16(a=in, b=false, sel=reset, out=resetValue);
+
+    // If reset = 0 and load = 1, the input should be loaded
+    Not(in=reset, out=notReset);
+    And(a=notReset, b=load, out=shouldLoad);
+    Mux16(a=resetValue, b=in, sel=shouldLoad, out=loadValue);
+    
+    // If reset = 0 and load = 0 and inc = 1, pc should be incremented
+    Not(in=load, out=notLoad);
+    And(a=notReset, b=notLoad, out=shouldNotLoadOrReset);
+    And(a=shouldNotLoadOrReset, b=inc, out=shouldInc);
+    Inc16(in=currValue, out=incValue);
+    Mux16(a=loadValue, b=incValue, sel=shouldInc, out=nextVal);
+    
+    Register(in=nextVal, load=true, out=currValue, out=out);
 }
