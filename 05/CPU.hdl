@@ -38,6 +38,64 @@ CHIP CPU {
         addressM[15],    // Address in data memory (of M)
         pc[15];          // address of next instruction
 
+    // Instruction format
+    // 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0 | index
+    // op  x  x  a c1 c2 c3 c4 c5 c6 d1 d2 d3 j1 j2 j3 | label
+
+    // op - computation instruction if set, addressing instruction otherwise
+    // x - not used for instruction purposes
+    // a - use memory value instead of A register value
+    // c1 to c6 - control bits for ALU
+    // d1 - write ALU output to A register
+    // d2 - write ALU output to D register
+    // d3 - write ALU output to Memory
+    // j1 - jump if ALU output is less than 0
+    // j2 - jump if ALU output is equal to 0
+    // j3 - jump if ALU output is greater than 0 
+
     PARTS:
-    // Put your code here:
+    ALU(x=aluX,
+        y=aluY,
+        zx=instruction[11], 
+        nx=instruction[10],
+        zy=instruction[9],
+        ny=instruction[8],
+        f=instruction[7],
+        no=instruction[6],
+        out=aluOut,
+        out=outM,
+        zr=isOutZero,
+        ng=isOutNegative);
+
+    // if computation instruction and d3 is set, write to memory
+    And(a=instruction[3], b=instruction[15], out=writeM);
+    
+    // if addressing instruction or d1 is set, write to A register
+    Not(in=instruction[15], out=isAInstruction);
+    Or(a=isAInstruction, b=instruction[5], out=writeA);
+    Mux16(a=aluOut, b=instruction, sel=isAInstruction, out=aRegisterIn);
+    ARegister(in=aRegisterIn, load=writeA, out=aRegisterOut, out[0..14]=addressM);
+    
+    // if a is set, use memory value rather than A register value for computation
+    Mux16(a=aRegisterOut, b=inM, sel=instruction[12], out=aluY);
+
+    // if computation instruction and d2 is set, write to D register
+    And(a=instruction[15], b=instruction[4], out=writeD);
+    DRegister(in=aluOut, load=writeD, out=aluX);
+
+    // PC counter logic
+    // determine if output is positive
+    Or(a=isOutZero, b=isOutNegative, out=isOutNotPositive);
+    Not(in=isOutNotPositive, out=isOutPositive);
+
+    // determine if a jump condition is satisfied
+    And(a=instruction[2], b=isOutNegative, out=jumpNegative);
+    And(a=instruction[1], b=isOutZero, out=jumpZero);
+    And(a=instruction[0], b=isOutPositive, out=jumpPositive);
+    Or(a=jumpNegative, b=jumpZero, out=jumpNonPositive);
+    Or(a=jumpNonPositive, b=jumpPositive, out=jumpConditionMet);
+
+    // load PC with jump address if jump condition is met (for a computation instruction), otherwise increment
+    And(a=instruction[15], b=jumpConditionMet, out=jump);
+    PC(in=aRegisterOut, load=jump, inc=true, reset=reset, out[0..14]=pc);
 }
