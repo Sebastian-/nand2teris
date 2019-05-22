@@ -27,5 +27,19 @@ CHIP Memory {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+    // Memory modules
+    RAM16K(in=in, load=loadData, address=address[0..13], out=dataOut);
+    Screen(in=in, load=loadScreen, address=address[0..12], out=screenOut);
+    Keyboard(out=keyboardOut);
+    
+    // select correct output
+    And(a=address[14], b=address[13], out=addressingKeyboard);
+    Mux16(a=dataOut, b=screenOut, sel=address[14], out=tempOut);
+    Mux16(a=tempOut, b=keyboardOut, sel=addressingKeyboard, out=out);
+
+    // set load bit of data or screen module
+    Not(in=addressingKeyboard, out=notAddressingKeyboard);
+    And(a=address[14], b=notAddressingKeyboard, out=addressingScreen);
+    DMux(in=load, sel=addressingScreen, a=loadData, b=loadScreen);
+
 }
